@@ -1,0 +1,128 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reorder Batch Summary</title>
+<style>
+  :root {
+    --bg: #f7f6f3; --card: #ffffff; --ink: #1c1b19; --muted: #6b6963; --line: #e3e1da; --grid: #e8e6df;
+    --reorder-bg: #fdecdf; --reorder-ink: #8a3410; --reorder: #e8662f;
+    --hold-bg: #e4f3e8; --hold-ink: #1d5c33; --hold: #2f9e5b;
+    --thresh: #5b5a55;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --card: #1f1f1d; --ink: #f0efec; --muted: #a3a199; --line: #343431; --grid: #2e2e2b;
+      --reorder-bg: #3a2216; --reorder-ink: #f6b48f; --reorder: #ef7a45;
+      --hold-bg: #17301f; --hold-ink: #8fd6a9; --hold: #3fb871;
+      --thresh: #c3c2b7;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 880px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 24px; margin: 0 0 4px; font-weight: 600; }
+  .sub { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  h2 { font-size: 16px; margin: 0 0 12px; font-weight: 600; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 10px 12px; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+  th { color: var(--muted); font-weight: 500; font-size: 13px; border-bottom: 1px solid var(--line); }
+  tbody tr.reorder { background: var(--reorder-bg); color: var(--reorder-ink); }
+  tbody tr.hold { background: var(--hold-bg); color: var(--hold-ink); }
+  td.dec { font-weight: 600; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .dash { width: 18px; border-top: 2px dashed var(--thresh); display: inline-block; }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { fill: var(--muted); font-size: 12px; font-family: inherit; }
+  svg text.val { fill: var(--ink); font-size: 14px; font-weight: 600; }
+  .note { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Reorder batch summary</h1>
+  <p class="sub">Weekly demand = forecast &divide; 4.33. Reorder when weeks of supply fall below 4 weeks (3 lead time + 1 safety); order up to 8 weeks of supply.</p>
+
+  <section>
+    <h2>Decisions by round</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Round</th><th>Month</th><th>Forecast</th><th>Inventory</th><th>Weeks of supply</th><th>Decision</th><th>Order qty</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Weeks of supply vs. 4-week threshold</h2>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--reorder)"></i>Reorder now</span>
+      <span><i class="sw" style="background:var(--hold)"></i>Hold</span>
+      <span><i class="dash"></i>Threshold (4 weeks)</span>
+    </div>
+    <div id="chart-wos" role="img" aria-label="Bar chart of weeks of supply for each round against the reorder threshold"></div>
+  </section>
+
+  <section>
+    <h2>Order quantity by round</h2>
+    <div id="chart-qty" role="img" aria-label="Bar chart of order quantity in units for each round"></div>
+    <p class="note">Rounds with a HOLD decision order 0 units.</p>
+  </section>
+</main>
+
+<script>
+const DATA = [{"Round":"A","Month":"July","Forecast":1544,"Inventory":1450,"WeeklyDemand":356.58,"WeeksOfSupply":4.07,"Decision":"HOLD","OrderQty":0},{"Round":"B","Month":"October","Forecast":1046,"Inventory":700,"WeeklyDemand":241.57,"WeeksOfSupply":2.9,"Decision":"REORDER NOW","OrderQty":1233},{"Round":"C","Month":"January","Forecast":890,"Inventory":620,"WeeklyDemand":205.54,"WeeksOfSupply":3.02,"Decision":"REORDER NOW","OrderQty":1024}];
+const THRESHOLD = 4;
+const fmt = (n, d = 0) => n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+const cls = r => r.Decision === 'HOLD' ? 'hold' : 'reorder';
+
+document.getElementById('rows').innerHTML = DATA.map(r => `
+  <tr class="${cls(r)}">
+    <td>Round ${r.Round}</td><td>${r.Month}</td>
+    <td>${fmt(r.Forecast)}</td><td>${fmt(r.Inventory)}</td>
+    <td>${fmt(r.WeeksOfSupply, 2)}</td>
+    <td class="dec">${r.Decision}</td>
+    <td>${r.Decision === 'HOLD' ? '&ndash;' : fmt(r.OrderQty)}</td>
+  </tr>`).join('');
+
+function barChart(el, values, max, ticks, unitFmt, threshold) {
+  const W = 760, H = 300, L = 56, R = 16, T = 28, B = 44;
+  const pw = W - L - R, ph = H - T - B, slot = pw / values.length, bw = Math.min(110, slot * 0.55);
+  const y = v => T + ph - (v / max) * ph;
+  let s = `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">`;
+  ticks.forEach(t => {
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)"/>`;
+    s += `<text x="${L - 8}" y="${y(t) + 4}" text-anchor="end">${unitFmt(t)}</text>`;
+  });
+  values.forEach((v, i) => {
+    const r = DATA[i], cx = L + slot * i + slot / 2, top = y(v), h = T + ph - top;
+    const color = r.Decision === 'HOLD' ? 'var(--hold)' : 'var(--reorder)';
+    if (h > 0) s += `<rect x="${cx - bw / 2}" y="${top}" width="${bw}" height="${h}" rx="4" fill="${color}"/>`;
+    s += `<text class="val" x="${cx}" y="${top - 8}" text-anchor="middle">${unitFmt(v, true)}</text>`;
+    s += `<text x="${cx}" y="${H - 22}" text-anchor="middle">Round ${r.Round}</text>`;
+    s += `<text x="${cx}" y="${H - 8}" text-anchor="middle">${r.Month}</text>`;
+  });
+  if (threshold != null) {
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(threshold)}" y2="${y(threshold)}" stroke="var(--thresh)" stroke-width="2" stroke-dasharray="6 4"/>`;
+  }
+  el.innerHTML = s + '</svg>';
+}
+
+barChart(document.getElementById('chart-wos'), DATA.map(r => r.WeeksOfSupply), 5, [0, 1, 2, 3, 4, 5],
+  (v, exact) => exact ? fmt(v, 2) : fmt(v), THRESHOLD);
+
+const maxQty = Math.max(...DATA.map(r => r.OrderQty), 1);
+const step = Math.pow(10, Math.floor(Math.log10(maxQty)));
+const qtyMax = Math.ceil(maxQty * 1.15 / step) * step;
+barChart(document.getElementById('chart-qty'), DATA.map(r => r.OrderQty), qtyMax,
+  [0, 1, 2, 3, 4].map(i => qtyMax * i / 4), v => fmt(v), null);
+</script>
+</body>
+</html>
+
